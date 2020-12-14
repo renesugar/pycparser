@@ -33,6 +33,13 @@ def expand_decl(decl):
     elif typ in [Struct, Union]:
         decls = [expand_decl(d) for d in decl.decls or []]
         return [typ.__name__, decl.name, decls]
+    elif typ == Enum:
+        if decl.values is None:
+            values = None
+        else:
+            assert isinstance(decl.values, EnumeratorList)
+            values = [enum.name for enum in decl.values.enumerators]
+        return ['Enum', decl.name, values]
     else:
         nested = expand_decl(decl.type)
 
@@ -855,6 +862,31 @@ class TestCParser_fundamentals(TestCParser_base):
                     ['Decl', 'heads',
                         ['PtrDecl', ['PtrDecl', ['TypeDecl', ['IdentifierType', ['Node']]]]]]]]]])
 
+    def test_struct_enum(self):
+        s1 = """
+            struct Foo {
+                enum Bar { A = 1 };
+            };
+        """
+        self.assertEqual(expand_decl(self.parse(s1).ext[0]),
+            ['Decl', None,
+             ['Struct', 'Foo',
+              [['Decl', None,
+                ['Enum', 'Bar', ['A']]]]]])
+        s2 = """
+            struct Foo {
+                enum Bar { A = 1, B, C } bar;
+                enum Baz { D = A } baz;
+            } foo;
+        """
+        self.assertEqual(expand_decl(self.parse(s2).ext[0]),
+            ['Decl', 'foo',
+             ['TypeDecl', ['Struct', 'Foo',
+              [['Decl', 'bar',
+                ['TypeDecl', ['Enum', 'Bar', ['A', 'B', 'C']]]],
+               ['Decl', 'baz',
+                ['TypeDecl', ['Enum', 'Baz', ['D']]]]]]]])
+
     def test_struct_with_extra_semis_inside(self):
         s1 = """
             struct {
@@ -1190,6 +1222,13 @@ class TestCParser_fundamentals(TestCParser_base):
         for b in bad:
             self.assertRaises(ParseError, self.parse, b)
 
+    def test_invalid_typedef_storage_qual_error(self):
+        """ Tests that using typedef as a storage qualifier is correctly flagged
+            as an error.
+        """
+        bad = 'typedef const int foo(int a) { return 0; }'
+        self.assertRaises(ParseError, self.parse, bad)
+
     def test_duplicate_typedef(self):
         """ Tests that redeclarations of existing types are parsed correctly.
             This is non-standard, but allowed by many compilers.
@@ -1463,6 +1502,16 @@ class TestCParser_fundamentals(TestCParser_base):
 
         d5 = self.get_decl_init(r'char* s = "foo\"" "bar";')
         self.assertEqual(d5, ['Constant', 'string', r'"foo\"bar"'])
+
+        # This is not correct based on the the C spec, but testing it here to
+        # see the behavior in action. Will have to fix this
+        # for https://github.com/eliben/pycparser/issues/392
+        #
+        # The spec says in section 6.4.5 that "escape sequences are converted
+        # into single members of the execution character set just prior to
+        # adjacent string literal concatenation".
+        d6 = self.get_decl_init(r'char* s = "\1" "23";')
+        self.assertEqual(d6, ['Constant', 'string', r'"\123"'])
 
     def test_unified_wstring_literals(self):
         d1 = self.get_decl_init('char* s = L"hello" L"world";')

@@ -3,13 +3,11 @@ pycparser v2.20
 ===============
 
 
-.. image:: https://travis-ci.org/eliben/pycparser.png?branch=master
+.. image:: https://github.com/eliben/pycparser/workflows/pycparser-tests/badge.svg
   :align: center
-  :target: https://travis-ci.org/eliben/pycparser
+  :target: https://github.com/eliben/pycparser/actions
 
-.. image:: https://ci.appveyor.com/api/projects/status/wrup68o5y8nuk1i9?svg=true
-  :align: center
-  :target: https://ci.appveyor.com/project/eliben/pycparser/
+----
 
 .. contents::
     :backlinks: none
